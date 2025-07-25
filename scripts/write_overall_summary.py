@@ -1,6 +1,46 @@
 import pandas as pd
 import numpy as np
 import argparse
+import os
+
+def diversity_cluster_path(base_dir, motif, rep=None):
+    path = base_dir
+    if rep is not None:
+        path += f"/rep{rep}/"
+    path += f"/{motif}/"
+    path += f"/esm_successful_backbones/diversity_cluster.tsv"
+    return path
+   
+def load_successes_and_cluster(fn):
+    # Return empty list if there are no successes
+    if not os.path.isfile(fn): return []
+
+    successes_and_cluster = []
+    with open(fn) as f:
+        for l in f:
+            if "assist" in l: continue
+            cluster, bb = l.split()
+            bb = int(bb[:-4].split("_")[-1])
+            cluster = int(cluster[:-4].split("_")[-1])
+            successes_and_cluster.append((bb,cluster))
+    return successes_and_cluster
+
+def MotifBenchScore(N, N_max=50, alpha=5):
+    return 100*((N_max + alpha)/N_max) * N / (N + alpha)
+
+def MBScore_boostrap(successes_and_cluster, n_subsamples=1000, subsample_size=50, alpha=5):
+    num_clusters = []
+    for _ in range(n_subsamples):
+        idcs = np.random.choice(100, subsample_size, replace=False)
+        successes_and_cluster_ = [(bb, cluster) for (bb, cluster) in
+                successes_and_cluster if bb in idcs]
+        num_clusters.append(len(set([cluster for (_, cluster) in
+            successes_and_cluster_])))
+    motif_bench_scores = [MotifBenchScore(num, N_max=subsample_size, alpha=alpha) for num in num_clusters]
+    mean = np.mean(motif_bench_scores)
+    sem = np.std(motif_bench_scores)/np.sqrt(n_subsamples)
+    return mean, sem
+
 
 def main(test_cases_file, summary_by_case_file, summary_by_group_file):
     # Load the input files
@@ -32,8 +72,17 @@ def main(test_cases_file, summary_by_case_file, summary_by_group_file):
     }
 
     # Compute the overall_score for all cases
-    alpha = 5
-    summary_by_case['overall_score'] = (100 + alpha) * summary_by_case['Num_Solutions'] / (summary_by_case['Num_Solutions'] + alpha)
+    base_dir = "/".join(summary_by_case_file.split("/")[:-1])
+    motifBenchScores = []
+    for i, test_case in enumerate(test_cases.pdb_id):
+        motif_name = f"{i+1:02d}_{test_case}"
+        if len([s for s in summary_by_case.Problem if motif_name == s]) == 0:
+            continue 
+        div_cluster_path = diversity_cluster_path(base_dir, motif_name)
+        successes_and_cluster = load_successes_and_cluster(div_cluster_path)
+        motifBenchScore = MBScore_boostrap(successes_and_cluster)[0]
+        motifBenchScores.append(motifBenchScore)
+    summary_by_case['overall_score'] = np.array(motifBenchScores)
     overall_score = summary_by_case['overall_score'].mean()
 
     # Save the output to a new CSV file
@@ -50,4 +99,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args.test_cases_file, args.summary_by_case_file, args.summary_by_group_file)
-
