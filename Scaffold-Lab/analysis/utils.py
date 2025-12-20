@@ -13,7 +13,6 @@ from pathlib import Path
 from datetime import datetime
 from tabulate import tabulate
 
-#import mdtraj as md
 import MDAnalysis as mda
 import biotite
 import biotite.structure.io as strucio
@@ -28,7 +27,6 @@ from tmtools import tm_align
 from Bio.PDB.parse_pdb_header import parse_pdb_header
 from Bio.PDB import PDBParser
 from pymol import cmd
-
 
 log = logging.getLogger(__name__)
 
@@ -1273,6 +1271,38 @@ def check_motif_AA_type(
     else:
         log.info(f"Residue types in designed backbone are consistent to standard motifs, continue.")
         return True
+    
+
+def reindex_pdb_residues(
+    original_file: Union[str, Path],
+    output_file: Union[str, Path],
+    original_start_index: int = 0,
+    reindex_start: int = 1
+):
+    """
+    Reindex the starting residue number in a PDB file.
+    If the original file already starts from the desired index, no changes are made.
+    
+    Args:
+      original_file: Path to the original PDB file.
+      output_file: Path to save the reindexed PDB file.
+      original_start_index: The starting residue number in the original PDB file.
+      reindex_start: The desired starting residue number in the output PDB file.
+    """
+    pdb_file = strucio.pdb.PDBFile.read(original_file)
+    atom_array = pdb_file.get_structure()[0]
+    if atom_array.res_id[0] == reindex_start:
+        return True
+    else:
+        offset = reindex_start - original_start_index
+        atom_array.res_id += offset
+
+        modified_pdb = strucio.pdb.PDBFile()
+        modified_pdb.set_structure(atom_array)
+        modified_pdb.write(output_file)
+        log.info(f"Original PDB file starts from residue {original_start_index},\
+            reindexed to start from {reindex_start} and saved to {output_file}")
+        return False
 
 
 # ------------------------Utils for Unconditional Generation--------------------
