@@ -190,4 +190,4 @@ This repository builds heavily on several existing codebases:
 * [Foldseek](https://github.com/steineggerlab/foldseek) is used for structural clustering and novelty evaluation.
 If you use the scripts herein in published research, please consider crediting these resources.
 
-We also thank Yeqing Lin, Wei Deng, Marvin Li for suggestions that improved the usability of the benchmark.
+We also thank Yeqing Lin, Wei Deng, and Marvin Li for suggestions that have improved MotifBench.
