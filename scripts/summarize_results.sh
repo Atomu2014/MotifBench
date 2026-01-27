@@ -21,6 +21,8 @@ echo "Problem,Num_Solutions,Novelty,Success_Rate,Num_Evaluated" > "$summary_by_c
 ls $base_output_dir/*/esm_summary.txt | while IFS= read -r summary_file; do
   if [ -f "$summary_file" ]; then
     # Extract relevant fields from the summary file
+    # When running the script on MacOS the `grep -oP` might encountered an error,
+    # If so, simply run `brew install pcre` and replace `grep -oP` with `pcregrep -o`
     protein=$(grep -oP 'Evaluated Protein\s*\|\s*\K\S+' "$summary_file")
     num_solutions=$(grep -oP 'Number of Unique Solutions\s*\(.*\)\s*\|\s*\K\d+' "$summary_file")
     novelty=$(grep -oP 'Novelty.*\|\s*\K[\d.]+' "$summary_file")

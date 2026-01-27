@@ -83,13 +83,12 @@ class MotifRefolder:
         self._conf = conf
         self._infer_conf = conf.inference
         self._sample_conf = self._infer_conf.samples
+        self._rng = np.random.default_rng(self._infer_conf.seed)
 
         # Sanity check
         if self._sample_conf.seq_per_sample < self._sample_conf.mpnn_batch_size:
             raise ValueError(f'Sequences per sample {self._sample_conf.seq_per_sample} < \
             batch size {self._sample_conf.mpnn_batch_size}!')
-
-        self._rng = np.random.default_rng(self._infer_conf.seed)
 
         # Set-up accelerator
         if torch.cuda.is_available():
@@ -148,7 +147,6 @@ class MotifRefolder:
 
 
     def run_sampling(self):
-        
         # Run ProteinMPNN
         motif_info_dict = {}
 
@@ -169,7 +167,6 @@ class MotifRefolder:
                             f"max_backbones={self._max_backbones}")
                     continue
 
-                
                 backbone_name = case_num + "_" + backbone_name
                 self._log.info(f"case_num: {case_num}, tested case: {backbone_name}, sample_num: {sample_num}")
                 reference_pdb = os.path.join(self._motif_pdb)
@@ -197,26 +194,6 @@ class MotifRefolder:
                     shutil.copy2(design_pdb, rename_design_pdb)
                     design_pdb = rename_design_pdb
                     naming_number += 1
-
-
-            # The following part is a test version and needed to be cleaned up.
-            if self._whole_benchmark_set is not None:
-                try:
-                    benchmark_set_info = pd.read_csv(self._whole_benchmark_set)
-                    reference_contig = benchmark_set_info.iloc[
-                        benchmark_set_info.iloc[:, 0] == backbone_name, 1
-                    ].values[0]
-
-                    #motif_pdb = os.path.join(, f"{backbone_name}.pdb")
-                    reference_motif = au.motif_extract(reference_contig, reference_pdb, atom_part="backbone")
-                except FileNotFoundError:
-                    raise FileNotFoundError(f"Benchmark Information not found in {benchmark_set_info}.")
-                except IndexError:
-                    raise ValueError(f"No contig value found for the name {backbone_name} in benchmark information.")
-                except Exception as e:
-                    pass
-                    #raise RuntimeError(f"An error occured while processing {pdb_file}.")
-                
 
             # Read motif information data and save into json file
             if os.path.exists(self._motif_csv):
@@ -275,7 +252,23 @@ class MotifRefolder:
                 redesign_positions=redesign_info, 
                 contig=contig
                 )
+            
+            # Check if residues starts from 1. If res starts from 0, re-index the pdb file.
+            # This will overwrite original protein if the starting index is not 1.
+            # The original pdb will be copied to another directory named "original_pdb" as a reference.
+            reindex_pdb_path = os.path.join(backbone_dir, f"{backbone_name}_{sample_num}.pdb")
+            original_pdb_dir = os.path.join(backbone_dir, "original_pdb")
+            one_based_index = au.reindex_pdb_residues(
+                original_file=design_pdb,
+                output_file=reindex_pdb_path
+            )
+            if one_based_index == False:
+                os.makedirs(original_pdb_dir, exist_ok=True)
+                shutil.copy2(design_pdb, original_pdb_dir)
+                self._log.info(f'Re-indexed PDB residues to start from 1 for {design_pdb}.')
+                design_pdb = reindex_pdb_path
                 
+            # Make sure the important motif residues have correct AA types
             if self._infer_conf.force_motif_AA_type:
                 modified_design_pdb_path = os.path.join(backbone_dir, f"{backbone_name}_{sample_num}.pdb")
                 
@@ -289,7 +282,6 @@ class MotifRefolder:
                     output_file=modified_design_pdb_path
                 )
                 if motif_AA_correct == False:
-                    original_pdb_dir = os.path.join(backbone_dir, "original_pdb")
                     os.makedirs(original_pdb_dir, exist_ok=True)
                     shutil.copy2(design_pdb, original_pdb_dir)
                     self._log.info(f"Copied original PDB to {original_pdb_dir} as reference.")
@@ -396,7 +388,6 @@ class MotifRefolder:
 
 
         # Run ProteinMPNN
-
         jsonl_path = os.path.join(decoy_pdb_dir, "parsed_pdbs.jsonl")
         process = subprocess.Popen([
             'python',
@@ -509,20 +500,16 @@ class MotifRefolder:
         af2_raw_dir = os.path.join(decoy_pdb_dir, 'af2_raw_outputs')
         fasta_seqs = fasta.FastaFile.read(mpnn_fasta_path)
         filtered_seqs = {header: seq for header, seq in fasta_seqs.items() if header.startswith("T=0")} # Drop original sequence
+        
         if self._sample_conf.sort_by_score:
         # Only take seqs with lowerst global score to enter refolding
             scores = []
             for i, (header, string) in enumerate(filtered_seqs.items()):
-                #if i == 0:
-                #    global_score = float(header.split(", ")[2].split("=")[1])
-                #    original_seq = (global_score, header, string)
-                #else:
                 global_score = float(header.split(", ")[3].split("=")[1])
                 scores.append((global_score, header, string))
             scores.sort(key=lambda x: x[0])
 
             top_seqs_list = scores[:self._sample_conf.seq_per_sample]
-            #top_seqs_list.insert(0, original_seq) # Include the original seq
             top_seqs = {header: seq for _, header, seq in top_seqs_list}
 
             top_seqs_path = os.path.join(
@@ -534,7 +521,6 @@ class MotifRefolder:
             _ = au.write_seqs_to_fasta(top_seqs, top_seqs_path)
         else:
             filtered_seqs = {header: seq for header, seq in fasta_seqs.items() if header.startswith("T=0")}
-            #print(f'filtered_seqs: {filtered_seqs}')
             _ = au.write_seqs_to_fasta(filtered_seqs, mpnn_fasta_path)
 
         seqs_to_refold = top_seqs_path if self._sample_conf.sort_by_score else mpnn_fasta_path
@@ -994,7 +980,6 @@ class MotifEvaluator:
                 prefix=prefix
             )
 
-
         # Write summary outputs
         for prefix in diversity_results.keys():
             au.write_summary_results(
@@ -1041,14 +1026,10 @@ class MotifEvaluator:
                         motif_json=os.path.join(self._result_dir, 'motif_info.json'),
                         save_path=os.path.join(closest_contender_path, f'{prefix}_closest_contender.pse')
                     )
-                
 
 
-
-@hydra.main(version_base=None, config_path="config",
-        config_name="motif_scaffolding.yaml")
+@hydra.main(version_base=None, config_path="config", config_name="motif_scaffolding.yaml")
 def run(conf: DictConfig) -> None:
-
 
     # Check that path to foldseek database has been specified
     if not conf.evaluation.get("foldseek_database"):
@@ -1062,7 +1043,7 @@ def run(conf: DictConfig) -> None:
     elapsed_time = time.time() - start_time
     print(f"Refolding finished in {elapsed_time:.2f}s.")
 
-    # Perform analysis on outputs
+    # Analyze outputs (diversity, novelty, etc.)
     start_time = time.time()
     evaluator = MotifEvaluator(conf)
     evaluator.run_evaluation()
