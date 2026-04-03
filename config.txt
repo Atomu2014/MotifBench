@@ -1,6 +1,6 @@
 # Paths configuration
-scaffold_base_dir=
-benchmark_dir=
-foldseek_db_path=
-base_output_dir=
-python_path=
+scaffold_base_dir=/data/yanruqu2/ProteinaEdit/scaffolds_motif_bench
+benchmark_dir=/data/yanruqu2/MotifBench
+foldseek_db_path=/data/yanruqu2/fs_pdb/pdb
+base_output_dir=/data/yanruqu2/MotifBench/output_ppflow
+python_path=/data/yanruqu2/miniforge3/envs/motif_bench/bin/python
