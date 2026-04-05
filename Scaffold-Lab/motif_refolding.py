@@ -995,8 +995,7 @@ class MotifEvaluator:
             )
 
         # Optional visualization
-        # if self._visualize:
-        if False:
+        if self._visualize:
             for method in self.folding_method:
                 self._log.info(f"Performing visualization for {method}.")
                 prefix = "esm" if method == "ESMFold" else "af2"

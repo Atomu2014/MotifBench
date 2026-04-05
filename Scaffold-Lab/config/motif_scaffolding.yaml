@@ -49,4 +49,4 @@ evaluation:
   foldseek_database: ???
   foldseek_cores_for_pdbTM: 8
   tmscore_threshold: 0.6 # `tmscore-threshold` parameter for Foldseek-Cluster
-  visualize: True
+  visualize: False
