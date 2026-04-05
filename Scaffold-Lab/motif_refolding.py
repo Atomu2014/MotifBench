@@ -35,6 +35,8 @@ from collections import defaultdict
 import esm
 import biotite.structure.io as strucio
 from biotite.sequence.io import fasta
+from tqdm import tqdm
+import glob
 
 
 path = rootutils.find_root(search_from='./', indicator=[".git", "setup.cfg"])
@@ -150,7 +152,8 @@ class MotifRefolder:
         # Run ProteinMPNN
         motif_info_dict = {}
 
-        for pdb_file in os.listdir(self._sample_dir):
+        for pdb_file in tqdm(sorted(glob.glob(os.path.join(self._sample_dir, '*.pdb'))), ncols=100):
+            pdb_file = os.path.basename(pdb_file)
 
             naming_number = 1
 
@@ -992,7 +995,8 @@ class MotifEvaluator:
             )
 
         # Optional visualization
-        if self._visualize:
+        # if self._visualize:
+        if False:
             for method in self.folding_method:
                 self._log.info(f"Performing visualization for {method}.")
                 prefix = "esm" if method == "ESMFold" else "af2"
@@ -1034,6 +1038,9 @@ def run(conf: DictConfig) -> None:
     # Check that path to foldseek database has been specified
     if not conf.evaluation.get("foldseek_database"):
         raise ValueError("The 'foldseek_database' must be specified in the configuration.")
+
+    # print complete config in yaml format
+    print(OmegaConf.to_yaml(conf))
 
     # Perform fixed backbone design and forward folding
     print('Starting refolding for motif-scaffolding task......')

@@ -53,6 +53,7 @@ def main():
     redesign_positions = []
     for chain_id, residues in residue_data.items():
         unk_res_nums = [res_num for res_num, res_name in residues.items() if res_name == 'UNK']
+        # unk_res_nums = [res_num for res_num, res_name in residues.items()]
         if unk_res_nums:
             chain_ranges = format_redesign_positions(chain_id, unk_res_nums)
             redesign_positions.append(chain_ranges)

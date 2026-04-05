@@ -4,3 +4,5 @@
 scaffolds*/
 output*/
 tmp/
+fs_input/
+fs_tmp/
